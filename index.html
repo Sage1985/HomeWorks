@@ -8,7 +8,6 @@
   <style>
     html,body,#player{width:100%;height:100%;margin:0;background:#000;overflow:hidden}
     #message{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:#050b14;font:24px Arial,sans-serif;text-align:center;padding:30px;box-sizing:border-box}
-    iframe{outline:0}
   </style>
 </head>
 <body>
@@ -32,14 +31,6 @@
         }
       }
 
-      function focusYouTubeFrame() {
-        var frame = document.querySelector("iframe");
-        if (frame && frame.focus) {
-          frame.setAttribute("tabindex", "0");
-          frame.focus();
-        }
-      }
-
       if (!validId(videoId)) {
         message.textContent = "Video no valido";
         tellParent("error", { code: "INVALID_VIDEO" });
@@ -53,7 +44,8 @@
           videoId: videoId,
           playerVars: {
             autoplay: 1,
-            controls: 1,
+            controls: 0,
+            disablekb: 1,
             playsinline: 1,
             rel: 0,
             modestbranding: 1,
@@ -63,7 +55,6 @@
             onReady: function (event) {
               message.style.display = "none";
               event.target.playVideo();
-              setTimeout(focusYouTubeFrame, 350);
               tellParent("ready", {
                 duration: event.target.getDuration(),
                 title: event.target.getVideoData().title || ""
@@ -94,7 +85,6 @@
         if (command === "pause") player.pauseVideo();
         if (command === "seek") player.seekTo(Number(event.data.seconds) || 0, true);
         if (command === "volume") player.setVolume(Math.max(0, Math.min(100, Number(event.data.value) || 0)));
-        if (command === "focus") focusYouTubeFrame();
         if (command === "status") {
           tellParent("state", {
             state: player.getPlayerState(),
