@@ -31,6 +31,14 @@
         }
       }
 
+      function sendState() {
+        tellParent("state", {
+          state: player.getPlayerState(),
+          currentTime: player.getCurrentTime(),
+          duration: player.getDuration()
+        });
+      }
+
       if (!validId(videoId)) {
         message.textContent = "Video no valido";
         tellParent("error", { code: "INVALID_VIDEO" });
@@ -80,28 +88,19 @@
 
       window.addEventListener("message", function (event) {
         var command = event.data && event.data.source === "medianest" ? event.data.command : "";
+        var targetTime;
         if (!player || typeof player.playVideo !== "function") return;
         if (command === "play") player.playVideo();
         if (command === "pause") player.pauseVideo();
         if (command === "seek") player.seekTo(Number(event.data.seconds) || 0, true);
+        if (command === "seekRelative") {
+          targetTime = Math.max(0, player.getCurrentTime() + (Number(event.data.seconds) || 0));
+          player.seekTo(targetTime, true);
+          sendState();
+        }
         if (command === "volume") player.setVolume(Math.max(0, Math.min(100, Number(event.data.value) || 0)));
-        if (command === "status") {
-          tellParent("state", {
-            state: player.getPlayerState(),
-            currentTime: player.getCurrentTime(),
-            duration: player.getDuration()
-          });
-        }
+        if (command === "status") sendState();
       });
-
-      setInterval(function () {
-        if (player && typeof player.getCurrentTime === "function") {
-          tellParent("time", {
-            currentTime: player.getCurrentTime(),
-            duration: player.getDuration()
-          });
-        }
-      }, 2000);
 
       var script = document.createElement("script");
       script.src = "https://www.youtube.com/iframe_api";
