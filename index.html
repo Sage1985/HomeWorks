@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MediaNest Player</title>
+  <style>
+    html,body,#player{width:100%;height:100%;margin:0;background:#000;overflow:hidden}
+    #message{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:#050b14;font:24px Arial,sans-serif}
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <div id="message">Preparando reproductor...</div>
+  <script>
+    (function () {
+      "use strict";
+      var params = new URLSearchParams(location.search);
+      var videoId = params.get("v") || "";
+      var message = document.getElementById("message");
+      var player = null;
+
+      function validId(value) {
+        return /^[A-Za-z0-9_-]{11}$/.test(value);
+      }
+
+      function tellParent(type, data) {
+        if (window.parent !== window) {
+          window.parent.postMessage({ source: "medianest-player", type: type, data: data || null }, "*");
+        }
+      }
+
+      if (!validId(videoId)) {
+        message.textContent = "Video no valido";
+        tellParent("error", { code: "INVALID_VIDEO" });
+        return;
+      }
+
+      window.onYouTubeIframeAPIReady = function () {
+        player = new YT.Player("player", {
+          width: "100%",
+          height: "100%",
+          videoId: videoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            playsinline: 1,
+            rel: 0,
+            origin: location.origin
+          },
+          events: {
+            onReady: function (event) {
+              message.style.display = "none";
+              event.target.playVideo();
+              tellParent("ready", {
+                duration: event.target.getDuration(),
+                title: event.target.getVideoData().title || ""
+              });
+            },
+            onStateChange: function (event) {
+              tellParent("state", {
+                state: event.data,
+                currentTime: player.getCurrentTime(),
+                duration: player.getDuration()
+              });
+            },
+            onError: function (event) {
+              message.style.display = "flex";
+              message.textContent = event.data === 101 || event.data === 150
+                ? "Este video no permite reproduccion dentro de otras aplicaciones"
+                : "No se pudo reproducir este video";
+              tellParent("error", { code: event.data });
+            }
+          }
+        });
+      };
+
+      window.addEventListener("message", function (event) {
+        var command = event.data && event.data.source === "medianest" ? event.data.command : "";
+        if (!player || typeof player.playVideo !== "function") return;
+        if (command === "play") player.playVideo();
+        if (command === "pause") player.pauseVideo();
+        if (command === "seek") player.seekTo(Number(event.data.seconds) || 0, true);
+        if (command === "volume") player.setVolume(Math.max(0, Math.min(100, Number(event.data.value) || 0)));
+        if (command === "status") {
+          tellParent("state", {
+            state: player.getPlayerState(),
+            currentTime: player.getCurrentTime(),
+            duration: player.getDuration()
+          });
+        }
+      });
+
+      setInterval(function () {
+        if (player && typeof player.getCurrentTime === "function") {
+          tellParent("time", {
+            currentTime: player.getCurrentTime(),
+            duration: player.getDuration()
+          });
+        }
+      }, 1000);
+
+      var script = document.createElement("script");
+      script.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(script);
+    }());
+  </script>
+</body>
+</html>
